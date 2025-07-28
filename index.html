@@ -12,6 +12,110 @@
     <!-- AngularJS CDN -->
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
 
+    <script type="module">
+            // Import the functions you need from the SDKs you need
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+            import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+            import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+            import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+            // IMPORTANT: For local testing, replace these with your actual Firebase project config.
+            // For security, DO NOT hardcode these in production code.
+            // Get your config from Firebase Console -> Project settings -> General
+            const firebaseConfig = {
+                apiKey: "AIzaSyBsETB44I1KkFv8CLEqhDlgP97O1t9R4f8", // Replace with your actual API Key
+                authDomain: "optern-41a9d.firebaseapp.com", // Replace with your Auth Domain
+                projectId: "optern-41a9d", // Replace with your Project ID
+                storageBucket: "optern-41a9d.firebasestorage.app", // Replace with your Storage Bucket
+                messagingSenderId: "117616214615", // Replace with your Messaging Sender ID
+                appId: "1:117616214615:web:2eb8cfd2f2c69597315912", // Replace with your App ID
+                measurementId: "G-QYFHFT2YKD" // Your Analytics Measurement ID
+            };
+
+            // For Canvas environment, these variables are injected. For local testing, use the above config.
+            const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+
+            // Initialize Firebase
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            const analytics = getAnalytics(app);
+
+
+            // Function to display a custom message box (re-used from landing page)
+            window.showMessage = function(message, isError = false) {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white p-8 rounded-lg shadow-xl text-center">
+                        <p class="text-lg font-semibold ${isError ? 'text-red-600' : 'text-navy-800'} mb-4">${message}</p>
+                        <button onclick="this.closest('.fixed').remove()" class="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-5 rounded-full shadow-lg transition duration-300 ease-in-out">
+                            Close
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            };
+
+            // Function to handle newsletter subscription
+            window.subscribeNewsletter = async function() {
+                // These will now correctly target the input and button in the "Stay Updated" section
+                const emailInput = document.getElementById('newsletter-email');
+                const email = emailInput.value.trim();
+                const subscribeButton = document.getElementById('subscribe-button');
+
+                if (!email) {
+                    window.showMessage('Please enter your email address.', true);
+                    return;
+                }
+
+                // Basic email validation
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    window.showMessage('Please enter a valid email address.', true);
+                    return;
+                }
+
+                subscribeButton.disabled = true;
+                subscribeButton.textContent = 'Subscribing...';
+
+                try {
+                    // Authenticate (anonymously if no custom token)
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    // Get current user ID (anonymous or authenticated)
+                    const userId = auth.currentUser?.uid || crypto.randomUUID();
+
+                    // Define Firestore collection path for public data
+                    // Use the projectId from firebaseConfig if __app_id is not defined
+                    // NOTE: You changed this path from `artifacts/${collectionAppId}/public/data/subscribers`
+                    // to just `subscribers`. Ensure your Firestore security rules reflect this new path!
+                    const collectionAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+                    const subscribersCollectionRef = collection(db, `subscribers`);
+
+                    // Add the email to Firestore
+                    await addDoc(subscribersCollectionRef, {
+                        email: email,
+                        timestamp: new Date(),
+                        userId: userId // Store userId for tracking
+                    });
+
+                    window.showMessage('Thank you for subscribing! We will notify you when we launch.');
+                    emailInput.value = ''; // Clear the input field
+                } catch (error) {
+                    console.error("Error subscribing:", error);
+                    window.showMessage(`Failed to subscribe: ${error.message}`, true);
+                } finally {
+                    subscribeButton.disabled = false;
+                    subscribeButton.textContent = 'Subscribe'; // Reset button text for this specific button
+                }
+            };
+        </script>
     <script>
         // AngularJS application module and controller
         angular.module('opternApp', [])
@@ -435,7 +539,7 @@
         </a>
     </section>
 
-    <!-- Trusted By Section 
+    <!-- Trusted By Section
     <section class="py-16 md:py-24 bg-white rounded-lg shadow-lg mx-auto max-w-7xl mt-8 px-6 md:px-12 text-center fade-in-on-scroll">
         <h2 class="text-3xl md:text-4xl font-bold text-navy-800 mb-12 fade-in-on-scroll">👥 Trusted By</h2>
         <p class="text-gray-600 text-lg fade-in-on-scroll delay-200">
@@ -447,7 +551,7 @@
             <img src="https://placehold.co/120x60/dcfce7/16a34a?text=Org+B" alt="Organization B Logo" class="h-16 object-contain grayscale hover:grayscale-0 transition duration-300">
             <img src="https://placehold.co/120x60/fff7ed/f97316?text=Social+Ent+C" alt="Social Enterprise C Logo" class="h-16 object-contain grayscale hover:grayscale-0 transition duration-300">
         </div>
-    </section>-->
+    </section> -->
 
     <!-- Testimonials Section -->
     <section class="py-16 md:py-24 bg-gray-50 rounded-lg shadow-lg mx-auto max-w-7xl mt-8 px-6 md:px-12 fade-in-on-scroll">
@@ -471,8 +575,8 @@
             Enter your email to get early access to new features, job listings, and platform updates.
         </p>
         <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 fade-in-on-scroll delay-400">
-            <input type="email" placeholder="📧 Your email address" class="w-full sm:w-80 p-3 rounded-full text-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-md">
-            <button class="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 px-8 rounded-full shadow-xl transition duration-300 ease-in-out transform hover:scale-105">
+            <input type="email" id="newsletter-email" placeholder="📧 Your email address" class="w-full sm:w-80 p-3 rounded-full text-gray-800 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-md">
+            <button id="subscribe-button" onclick="subscribeNewsletter()" class="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 px-8 rounded-full shadow-xl transition duration-300 ease-in-out transform hover:scale-105">
                 Subscribe
             </button>
         </div>
