@@ -16,7 +16,8 @@
             // Import the functions you need from the SDKs you need
             import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
             import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-            import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+            import { getFirestore, collection, addDoc, query, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+//                                                        ^^^^^^^^^^^^^^ ADD THESE
             import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
             // IMPORTANT: For local testing, replace these with your actual Firebase project config.
@@ -60,61 +61,73 @@
             };
 
             // Function to handle newsletter subscription
-            window.subscribeNewsletter = async function() {
-                // These will now correctly target the input and button in the "Stay Updated" section
-                const emailInput = document.getElementById('newsletter-email');
-                const email = emailInput.value.trim();
-                const subscribeButton = document.getElementById('subscribe-button');
+            // ... (your existing Firebase config and initialization) ...
 
-                if (!email) {
-                    window.showMessage('Please enter your email address.', true);
-                    return;
+        // Function to handle newsletter subscription
+        window.subscribeNewsletter = async function() {
+            const emailInput = document.getElementById('newsletter-email');
+            const email = emailInput.value.trim();
+            const subscribeButton = document.getElementById('subscribe-button');
+
+            if (!email) {
+                window.showMessage('Please enter your email address.', true);
+                return;
+            }
+
+            // Basic email validation
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                window.showMessage('Please enter a valid email address.', true);
+                return;
+            }
+
+            subscribeButton.disabled = true;
+            subscribeButton.textContent = 'Subscribing...';
+
+            try {
+                // Authenticate (anonymously if no custom token)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
                 }
 
-                // Basic email validation
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    window.showMessage('Please enter a valid email address.', true);
-                    return;
+                // Get current user ID (anonymous or authenticated)
+                const userId = auth.currentUser?.uid || crypto.randomUUID();
+
+                // Define Firestore collection path for public data
+                const collectionAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+                // IMPORTANT: Ensure this path matches your security rules
+                const subscribersCollectionRef = collection(db, `subscribers`); // Or `artifacts/${collectionAppId}/public/data/subscribers` if you changed it back
+
+                // --- NEW LOGIC: Check for existing email ---
+                const q = query(subscribersCollectionRef, where("email", "==", email));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    // Email already exists
+                    window.showMessage('This email address is already subscribed. Thank you!', false); // Not an error, just a notification
+                    emailInput.value = ''; // Clear the input
+                    return; // Stop execution
                 }
+                // --- END NEW LOGIC ---
 
-                subscribeButton.disabled = true;
-                subscribeButton.textContent = 'Subscribing...';
+                // Add the email to Firestore (only if it doesn't already exist)
+                await addDoc(subscribersCollectionRef, {
+                    email: email,
+                    timestamp: new Date(),
+                    userId: userId // Store userId for tracking
+                });
 
-                try {
-                    // Authenticate (anonymously if no custom token)
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-
-                    // Get current user ID (anonymous or authenticated)
-                    const userId = auth.currentUser?.uid || crypto.randomUUID();
-
-                    // Define Firestore collection path for public data
-                    // Use the projectId from firebaseConfig if __app_id is not defined
-                    // NOTE: You changed this path from `artifacts/${collectionAppId}/public/data/subscribers`
-                    // to just `subscribers`. Ensure your Firestore security rules reflect this new path!
-                    const collectionAppId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
-                    const subscribersCollectionRef = collection(db, `subscribers`);
-
-                    // Add the email to Firestore
-                    await addDoc(subscribersCollectionRef, {
-                        email: email,
-                        timestamp: new Date(),
-                        userId: userId // Store userId for tracking
-                    });
-
-                    window.showMessage('Thank you for subscribing! We will notify you when we launch.');
-                    emailInput.value = ''; // Clear the input field
-                } catch (error) {
-                    console.error("Error subscribing:", error);
-                    window.showMessage(`Failed to subscribe: ${error.message}`, true);
-                } finally {
-                    subscribeButton.disabled = false;
-                    subscribeButton.textContent = 'Subscribe'; // Reset button text for this specific button
-                }
-            };
+                window.showMessage('Thank you for subscribing! We will notify you when we launch.');
+                emailInput.value = ''; // Clear the input field
+            } catch (error) {
+                console.error("Error subscribing:", error);
+                window.showMessage(`Failed to subscribe: ${error.message}`, true);
+            } finally {
+                subscribeButton.disabled = false;
+                subscribeButton.textContent = 'Subscribe'; // Reset button text
+            }
+        };
         </script>
     <script>
         // AngularJS application module and controller
